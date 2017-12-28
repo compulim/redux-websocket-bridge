@@ -1,7 +1,7 @@
 {
-  "name": "redux-websocket-action-bridge",
+  "name": "redux-websocket-bridge",
   "version": "0.0.1-0",
-  "description": "Redux WebSocket to action bridge",
+  "description": "WebSocket messages to Redux action bridge",
   "main": "lib/index.js",
   "module": "lib/index.js",
   "files": [
@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "build": "babel ./src --out-dir ./lib --source-maps --ignore *.spec.js,*.test.js",
-    "prepublish": "rimraf lib && npm run build",
+    "prepare": "rimraf lib && npm run build",
     "test": "jest"
   },
   "author": {

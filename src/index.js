@@ -41,32 +41,30 @@ export default function createWebSocketMiddleware(urlOrFactory, options = DEFAUL
     ws.onopen = () => store.dispatch({ type: `${ actionPrefix }${ OPEN }` });
     ws.onclose = () => store.dispatch({ type: `${ actionPrefix }${ CLOSE }` });
     ws.onmessage = event => {
-      if (event.data instanceof Blob) {
-        blobToArrayBuffer(event.data).then(payload => {
-          store.dispatch({
-            type: `${ actionPrefix }${ MESSAGE }`,
-            payload
-          });
-        });
+      let getPayload;
+
+      if (options.binaryType === 'arrayBuffer' && event.data instanceof Blob) {
+        getPayload = blobToArrayBuffer(event.data);
+      } else if (options.binaryType === 'blob' && event.data instanceof ArrayBuffer) {
+        getPayload = new Blob([event.data]);
       } else {
+        // We make this a Promise because we might want to keep the sequence of dispatch, @@websocket/MESSAGE first, then unfold later.
+        getPayload = Promise.resolve(event.data);
+      }
+
+      getPayload.then(payload => {
         store.dispatch({
           type: `${ actionPrefix }${ MESSAGE }`,
-          payload: event.data
+          payload
         });
-      }
 
-      if (options.unfold) {
-        let obj;
+        if (typeof payload === 'string' && options.unfold) {
+          const action = tryParseJSON(payload);
 
-        try {
-          obj = JSON.parse(event.data);
-        } catch (err) {}
-
-        if (obj && isFSA(obj)) {
           // TODO: Consider optional prefix to incoming actions
-          store.dispatch(obj);
+          isFSA(action) && store.dispatch(action);
         }
-      }
+      });
     }
 
     return next => action => {
@@ -84,4 +82,10 @@ export default function createWebSocketMiddleware(urlOrFactory, options = DEFAUL
       return next(action);
     }
   };
+}
+
+function tryParseJSON(json) {
+  try {
+    return JSON.parse(json);
+  } catch (err) {}
 }

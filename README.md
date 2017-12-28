@@ -1,4 +1,4 @@
-# Redux WebSocket to action bridge
+# Unfolds and dispatches WebSocket messages into Redux store
 
 Inspired by [redux-websocket](https://github.com/giantmachines/redux-websocket).
 
@@ -19,7 +19,7 @@ This bridge middleware will:
 
 ```js
 import { applyMiddleware, createStore } from 'redux';
-import WebSocketActionBridge from 'redux-websocket-action-bridge';
+import WebSocketActionBridge from 'redux-websocket-bridge';
 
 const createStoreWithMiddleware = applyMiddleware(
   WebSocketActionBridge('ws://localhost:4000/', { unfold: true })
@@ -28,14 +28,14 @@ const createStoreWithMiddleware = applyMiddleware(
 export default createStore(...);
 ```
 
-> Tips: you can add more than one `WebSocketActionBridge` to your store by namespacing them with [`actionPrefix`](#options).
+> Tips: you can add more than one `WebSocketBridge` to your store by namespacing them with [`actionPrefix`](#options).
 
 ### Reducer
 
 Because we support multiple bridges in a single store, namespace prefix is added to action type, by default, `@@websocket/`.
 
 ```js
-import { OPEN, CLOSE, MESSAGE } from 'redux-websocket-action-bridge';
+import { OPEN, CLOSE, MESSAGE } from 'redux-websocket-bridge';
 
 function serverConnectivity(state = {}, action) {
   switch (action.type) {
@@ -150,25 +150,40 @@ In addition to sending over WebSocket, the action will also dispatch locally.
 ## Advanced topics
 
 * [Use SockJS](#use-sockjs)
+  * [WebSocket APIs used by the bridge](#websocket-apis-used-by-the-bridge)
 * [Prefer `ArrayBuffer`](#prefer-arraybuffer)
 
 ### Use SockJS
 
-The action bridge supports any libraries that adheres to WebSocket standard, for example, [SockJS](http://sockjs.org), which provides fallback for browser/proxy that does not support WebSocket.
+The bridge supports any libraries that adheres to WebSocket standard, for example, [SockJS](http://sockjs.org), which provides fallback for browser/proxy that does not support WebSocket.
 
 ```js
 const createStoreWithMiddleware = applyMiddleware(
-  WebSocketActionBridge(
+  WebSocketBridge(
     () => new SockJS('http://localhost:3000/ws/')
   )
 )(createStore);
 ```
+
+#### WebSocket APIs used by the bridge
+
+If you are unsure if your WebSocket implementation will work on the bridge or not, check it against the list of required WebSocket APIs list below:
+
+* `onopen`
+* `onclose`
+* `onmessage(event)`
+  * `event.data`
+    * Unfold enabled: it should support returning `string`
+* `send`
+  * Unfold enabled: it should support sending `string`
 
 ### Prefer `ArrayBuffer`
 
 WebSocket standard support sending binary data. But receiving binary data means you might be receiving either `ArrayBuffer` or `Blob`, depends on your WebSocket implementation.
 
 For your convenience, if you set `binaryType` to `arrayBuffer`, we will convert all `Blob` into `ArrayBuffer` before dispatching it to Redux store.
+
+Vice versa, if you set `binaryType` to `blob`, we will convert all `ArrayBuffer` into `Blob`.
 
 ## Options
 
