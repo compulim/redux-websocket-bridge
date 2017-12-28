@@ -4,7 +4,9 @@ Inspired by [redux-websocket](https://github.com/giantmachines/redux-websocket).
 
 This bridge middleware will:
 
-* Pumps messages from Web Socket into Redux actions
+* Pumps Web Socket messages into Redux actions
+  * As `@@websocket/MESSAGE`, payload as-is
+  * Unfold as a Redux action
 * Pumps Redux actions into Web Socket messages
 
 ## How to use
@@ -20,21 +22,17 @@ import { applyMiddleware, createStore } from 'redux';
 import WebSocketActionBridge from 'redux-websocket-action-bridge';
 
 const createStoreWithMiddleware = applyMiddleware(
-  WebSocketActionBridge(
-    () => new WebSocket('ws://localhost:4000'),
-    {
-      actionPrefix: '@@websocket/',
-      unfold: false
-    }
-  )
+  WebSocketActionBridge('ws://localhost:4000/', { unfold: true })
 )(createStore);
 
 export default createStore(...);
 ```
 
-When you create the store, you can add one or more instances of `WebSocketActionBridge` thru `applyMiddleware`.
+> Tips: you can add more than one `WebSocketActionBridge` to your store by namespacing them with [`actionPrefix`](#options).
 
 ### Reducer
+
+Because we support multiple bridges in a single store, namespace prefix is added to action type, by default, `@@websocket/`.
 
 ```js
 import { OPEN, CLOSE, MESSAGE } from 'redux-websocket-action-bridge';
@@ -50,7 +48,7 @@ function serverConnectivity(state = {}, action) {
     break;
 
   case `@@websocket/${ MESSAGE }`:
-    // Process the raw message here
+    // Process the raw message here, either string, Blob, or ArrayBuffer
     break;
 
   default: break;
@@ -80,13 +78,13 @@ When an event is received thru the Web Socket, it will be dispatched into the st
 // When the socket received a message, the payload is a string
 {
   "type": "@@websocket/MESSAGE",
-  "payload": "<Raw message here>"
+  "payload": "<string, ArrayBuffer, or Blob>"
 }
 ```
 
 ### Action
 
-To send a message, you dispatch an action with `string` as the payload. By default, the action type is `@@websocket/SEND`.
+To send a message, you dispatch an action with the payload and set `type` to `@@websocket/SEND`. You can only send payload your WebSocket implementation support, e.g. `string`, `ArrayBuffer`, and `Blob`.
 
 ```js
 import { SEND } from 'redux-websocket-action-bridge';
@@ -98,23 +96,30 @@ function fetchServerVersion() {
 
 > If `options.unfold` is set to true and `payload` looks like a [Flux Standard Action](https://github.com/acdlite/flux-standard-action), it will be dispatched locally too.
 
-## Advanced topics
+## Unfolding message
 
-* [Dispatching message as action](#dispatching-message-as-action)
-* [Use SockJS](#use-sockjs)
+Instead of receiving WebSocket messages as a generic `@@websocket/MESSAGE` action, the bridge can automatically unfold the payload if it is a JSON and looks like a [Flux Standard Action](https://github.com/acdlite/flux-standard-action). For example, the following WebSocket message will be unfolded:
 
-### Dispatching message as action
+```json
+"{\"type\":\"SERVER/ALIVE\",\"payload\":{\"version\":\"1.0.0\"}}"
+```
 
-Instead of dispatching as a generic `@@websocket/MESSAGE` action with `string` as payload, the bridge can automatically unfold the payload if it is a JSON and looks like a [Flux Standard Action](https://github.com/acdlite/flux-standard-action).
+It will be unfolded into an action:
 
-By unfolding Redux actions, you can reduce code and create interesting code pattern. For example, server can send greeting action on connect.
+```js
+{
+  type: 'SERVER/ALIVE',
+  payload: { version: '1.0.0' }
+}
+```
+
+By unfolding Redux actions, you can reduce code and create interesting code pattern. For example, server can send greeting action on connect. The WebSocket message will be directly dispatched into Redux store.
 
 ```js
 ws.on('connection', socket => {
   socket.write(JSON.stringify({
     type: 'SERVER/VERSION',
     payload: {
-      platform: require('os').platform,
       version: require('./package.json').version
     }
   }));
@@ -124,13 +129,30 @@ ws.on('connection', socket => {
 Unfold also applies when you are sending out a JavaScript object that looks like an action.
 
 ```js
-this.props.dispatch(send({
-  type: 'CLIENT/SIGN_IN',
-  payload: { username, token }
+this.props.dispatch({
+  type: '@@websocket/SEND',
+  payload: {
+    type: 'CLIENT/SIGN_IN',
+    payload: { token: 'my very secret token' }
+  }
 }));
 ```
 
-It will both dispatch the action locally, and send it over WebSocket in JSON format.
+> What-if: if you are sending a JavaScript object and it does not pass the FSA test, it will be passed to `WebSocket.send()` as-is without modifications.
+
+In addition to sending over WebSocket, the action will also dispatched locally.
+
+```js
+{
+  type: 'CLIENT/SIGN_IN',
+  payload: { token: 'my very secret token' }
+}
+```
+
+## Advanced topics
+
+* [Use SockJS](#use-sockjs)
+* [Prefer `ArrayBuffer`](#prefer-arraybuffer)
 
 ### Use SockJS
 
@@ -147,6 +169,12 @@ const createStoreWithMiddleware = applyMiddleware(
   )
 )(createStore);
 ```
+
+### Prefer `ArrayBuffer`
+
+WebSocket standard support sending binary data. But receiving binary data means you might be receiving either `ArrayBuffer` or `Blob`, depends on your WebSocket implementation.
+
+For your convenience, if you set `binaryType` to `arrayBuffer`, we will convert all `Blob` into `ArrayBuffer` before dispatching it to Redux store.
 
 ## Options
 
