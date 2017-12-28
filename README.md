@@ -4,10 +4,10 @@ Inspired by [redux-websocket](https://github.com/giantmachines/redux-websocket).
 
 This bridge middleware will:
 
-* Pumps Web Socket messages into Redux actions
+* Dispatches WebSocket messages into Redux store
   * As `@@websocket/MESSAGE`, payload as-is
   * Unfold as a Redux action
-* Pumps Redux actions into Web Socket messages
+* Pumps Redux action payload to WebSocket
 
 ## How to use
 
@@ -58,23 +58,23 @@ function serverConnectivity(state = {}, action) {
 }
 ```
 
-When an event is received thru the Web Socket, it will be dispatched into the store as one of the actions below:
+When an event is received thru the WebSocket, it will be dispatched into the store as one of the actions below:
 
-```json
+```js
 // When the socket is connected
 {
   "type": "@@websocket/OPEN"
 }
 ```
 
-```json
+```js
 // When the socket is disconnected
 {
   "type": "@@websocket/CLOSE"
 }
 ```
 
-```json
+```js
 // When the socket received a message, the payload is a string
 {
   "type": "@@websocket/MESSAGE",
@@ -94,13 +94,11 @@ function fetchServerVersion() {
 }
 ```
 
-> If `options.unfold` is set to true and `payload` looks like a [Flux Standard Action](https://github.com/acdlite/flux-standard-action), it will be dispatched locally too.
-
 ## Unfolding message
 
 Instead of receiving WebSocket messages as a generic `@@websocket/MESSAGE` action, the bridge can automatically unfold the payload if it is a JSON and looks like a [Flux Standard Action](https://github.com/acdlite/flux-standard-action). For example, the following WebSocket message will be unfolded:
 
-```json
+```js
 "{\"type\":\"SERVER/ALIVE\",\"payload\":{\"version\":\"1.0.0\"}}"
 ```
 
@@ -117,7 +115,7 @@ By unfolding Redux actions, you can reduce code and create interesting code patt
 
 ```js
 ws.on('connection', socket => {
-  socket.write(JSON.stringify({
+  socket.send(JSON.stringify({
     type: 'SERVER/VERSION',
     payload: {
       version: require('./package.json').version
@@ -140,7 +138,7 @@ this.props.dispatch({
 
 > What-if: if you are sending a JavaScript object and it does not pass the FSA test, it will be passed to `WebSocket.send()` as-is without modifications.
 
-In addition to sending over WebSocket, the action will also dispatched locally.
+In addition to sending over WebSocket, the action will also dispatch locally.
 
 ```js
 {
@@ -156,16 +154,12 @@ In addition to sending over WebSocket, the action will also dispatched locally.
 
 ### Use SockJS
 
-The action bridge supports any libraries that adheres to WebSocket standard, for example, [SockJS](http://sockjs.org), which provides fallback for browser that does not support Web Socket.
+The action bridge supports any libraries that adheres to WebSocket standard, for example, [SockJS](http://sockjs.org), which provides fallback for browser/proxy that does not support WebSocket.
 
 ```js
 const createStoreWithMiddleware = applyMiddleware(
   WebSocketActionBridge(
-    () => new WebSocket('ws://localhost:4000'),
-    {
-      actionPrefix: '@@websocket/',
-      unfold: false
-    }
+    () => new SockJS('http://localhost:3000/ws/')
   )
 )(createStore);
 ```
@@ -181,11 +175,11 @@ For your convenience, if you set `binaryType` to `arrayBuffer`, we will convert 
 | Name | Description | Default |
 | - | - | - |
 | `actionPrefix` | Action prefix for all system messages | `"@@websocket/"` |
-| `binaryType` | Convert binary to `arrayBuffer` or `blob` | `null` |
-| `unfold` | Unfold message as an action object if they are JSON and looks like a [Flux Standard Action](https://github.com/acdlite/flux-standard-action), and vice versa | `false` |
+| `binaryType` | Convert binary to `"arrayBuffer"` or `"blob"` | `null` |
+| `unfold` | Unfold messages as actions if they are JSON and look like a [Flux Standard Action](https://github.com/acdlite/flux-standard-action), and vice versa | `false` |
 
 ## Contributions
 
 Like us? [Star](https://github.com/compulim/redux-websocket-action-bridge/stargazers) us.
 
-Something not right? File us an [issue](https://github.com/compulim/electron-ipcrenderer-websocket/issues).
+Something not right? File us an [issue](https://github.com/compulim/redux-websocket-action-bridge/issues).
