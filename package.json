@@ -1,6 +1,6 @@
 {
   "name": "redux-websocket-action-bridge",
-  "version": "1.0.0",
+  "version": "0.0.1-0",
   "description": "Redux WebSocket to action bridge",
   "main": "lib/index.js",
   "module": "lib/index.js",
