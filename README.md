@@ -48,7 +48,7 @@ function serverConnectivity(state = {}, action) {
     break;
 
   case `@@websocket/${ MESSAGE }`:
-    // Process the raw message here, either string, Blob, or ArrayBuffer
+    // Process the raw message here, either string, ArrayBuffer, or Blob
     break;
 
   default: break;
