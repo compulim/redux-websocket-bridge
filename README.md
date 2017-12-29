@@ -11,7 +11,7 @@ This bridge middleware will:
 
 WebSocket provides a full duplex connection. On top of request-response model, the server can watch-and-push to the browser continuously. But comparing coding effort between REST and WebSocket, fetching data using REST is much simpler.
 
-We want to reduce the effort to write APIs exposed thru WebSocket.
+We want to reduce the effort to consume APIs exposed thru WebSocket.
 
 By combining WebSocket and Flux architecture (Redux), we found that the coding effort can be dramatically lowered to a level comparable to traditional REST APIs.
 
