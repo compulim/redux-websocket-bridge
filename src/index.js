@@ -57,29 +57,29 @@ export default function createWebSocketMiddleware(urlOrFactory, options = DEFAUL
           const action = tryParseJSON(payload);
 
           // TODO: Consider optional prefix to incoming actions
-          isFSA(action) && store.dispatch(action);
-        } else {
-          store.dispatch({
-            type: `${ actionPrefix }${ MESSAGE }`,
-            payload
-          });
+          if (isFSA(action)) {
+            return store.dispatch(action);
+          }
         }
+
+        store.dispatch({
+          type: `${ actionPrefix }${ MESSAGE }`,
+          payload
+        });
       });
     }
 
     return next => action => {
       if (action.type === `${ actionPrefix }${ SEND }`) {
-        let { payload } = action;
-
-        if (options.unfold && isFSA(payload)) {
-          ws.send(JSON.stringify(payload));
-        } else {
-          ws.send(payload);
-        }
+        ws.send(action.payload);
+      } else if (action.send === true || action.send === actionPrefix) {
+        action = { ...action };
+        delete action.send;
+        ws.send(JSON.stringify(action));
       }
 
       return next(action);
-    }
+    };
   };
 }
 
