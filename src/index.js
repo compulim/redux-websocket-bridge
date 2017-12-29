@@ -19,15 +19,16 @@ export function open() {
 }
 
 const DEFAULT_OPTIONS = {
-  actionPrefix: '@@websocket/',
-  binaryType  : 'arrayBuffer',
-  unfold      : false
+  binaryType: 'arraybuffer',
+  namespace : '@@websocket/',
+  unfold    : true
 };
 
 export default function createWebSocketMiddleware(urlOrFactory, options = DEFAULT_OPTIONS) {
   options = { ...DEFAULT_OPTIONS, ...options };
+  options.binaryType = options.binaryType.toLowerCase();
 
-  const { actionPrefix } = options;
+  const { namespace } = options;
 
   return store => {
     let ws;
@@ -38,12 +39,12 @@ export default function createWebSocketMiddleware(urlOrFactory, options = DEFAUL
       ws = new WebSocket(urlOrFactory);
     }
 
-    ws.onopen = () => store.dispatch({ type: `${ actionPrefix }${ OPEN }` });
-    ws.onclose = () => store.dispatch({ type: `${ actionPrefix }${ CLOSE }` });
+    ws.onopen = () => store.dispatch({ type: `${ namespace }${ OPEN }` });
+    ws.onclose = () => store.dispatch({ type: `${ namespace }${ CLOSE }` });
     ws.onmessage = event => {
       let getPayload;
 
-      if (typeof Blob !== 'undefined' && options.binaryType === 'arrayBuffer' && event.data instanceof Blob) {
+      if (typeof Blob !== 'undefined' && options.binaryType === 'arraybuffer' && event.data instanceof Blob) {
         getPayload = blobToArrayBuffer(event.data);
       } else if (typeof ArrayBuffer !== 'undefined' && options.binaryType === 'blob' && event.data instanceof ArrayBuffer) {
         getPayload = new Blob([event.data]);
@@ -63,19 +64,22 @@ export default function createWebSocketMiddleware(urlOrFactory, options = DEFAUL
         }
 
         store.dispatch({
-          type: `${ actionPrefix }${ MESSAGE }`,
+          type: `${ namespace }${ MESSAGE }`,
           payload
         });
       });
     }
 
     return next => action => {
-      if (action.type === `${ actionPrefix }${ SEND }`) {
+      if (action.type === `${ namespace }${ SEND }`) {
         ws.send(action.payload);
-      } else if (action.send === true || action.send === actionPrefix) {
-        action = { ...action };
-        delete action.send;
-        ws.send(JSON.stringify(action));
+      } else if (action.meta && (action.meta.send === true || action.meta.send === namespace)) {
+        const sendAction = {
+          ...action,
+          meta: { ...action.meta, send: undefined }
+        };
+
+        ws.send(JSON.stringify(sendAction));
       }
 
       return next(action);

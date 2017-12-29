@@ -8,6 +8,10 @@ test('return true on FSA-compliant action with payload', () => {
   expect(isFSA({ type: 'ACTION_NAME', payload: {} })).toBe(true);
 });
 
+test('return true on FSA-compliant action with meta', () => {
+  expect(isFSA({ type: 'ACTION_NAME', meta: {} })).toBe(true);
+});
+
 test('return true on FSA-compliant error action', () => {
   expect(isFSA({ type: 'ACTION_NAME', error: true })).toBe(true);
 });

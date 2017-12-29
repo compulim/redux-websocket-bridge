@@ -117,17 +117,19 @@ function sendHelloWorld() {
 
 #### Sending action as JSON
 
-You can also opt-in to send any action dispatched to your store thru WebSocket. On the action object, set `send` to `true` (or your namespace). When you dispatch the action, the bridge will also `JSON.stringify` and send a copy of the action to WebSocket.
+> Using this feature will make your action not complies with FSA.
+
+You can also opt-in to send any action dispatched to your store thru WebSocket. On the action object, set `meta.send` to `true` (or your namespace). When you dispatch the action, the bridge will also `JSON.stringify` and send a copy of the action to WebSocket.
 
 ```js
 this.props.dispatch({
   type: 'CLIENT/SIGN_IN',
-  payload: { token: 'my very secret token' },
-  send: true // or '@@websocket'
+  meta: { send: true } // or '@@websocket',
+  payload: { token: 'my very secret token' }
 });
 ```
 
-The action dispatched will be sent thru WebSocket similar to the following code. Note the `send` property is stripped from the message to make the JSON message complies to FSA.
+The action dispatched will be sent thru WebSocket similar to the following code. Note the `meta.send` property is stripped from the message and is not send across the wire.
 
 ```js
 ws.send(JSON.stringify({
@@ -135,6 +137,8 @@ ws.send(JSON.stringify({
   payload: { token: 'my very secret token' }
 }));
 ```
+
+> Tips: you can also use the bridge on server-side to unfold messages back into a Redux store
 
 > What-if: if your action is not a FSA-compliant, we will still send it thru. This behavior may change in the future.
 
