@@ -190,24 +190,22 @@ Vice versa, if you set `binaryType` to `blob`, we will convert all `ArrayBuffer`
 
 ### Reconnection logic
 
-For simplicity, the bridge does not have any reconnection mechanism. But it is simple to implement one, thanks to simple WebSocket API.
+For simplicity, the bridge does not have any reconnection mechanism. But it is easy to implement one, thanks to simple WebSocket API.
 
-To implement your own reconnection logic, you can create a new WebSocket-alike. When disconnected, your implementation will recreate a new WebSocket object. You will be managing the lifetime of WebSocket objects and event subscriptions.
+To implement your own reconnection logic, you can create a new WebSocket-alike. When disconnected, your implementation will recreate a new WebSocket object, which reconnect to your server. You will be managing the lifetime of WebSocket objects, event subscriptions, and resend backlog.
 
 Although you are recommended to fully implement the [WebSocket API](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket), you can check out the [subset](#websocket-apis-used-by-the-bridge) required by the bridge.
 
 ### Unfolding actions from multiple bridges
 
-We support multiple bridges. In rare cases, you may want to tag unfolded actions from multiple bridges.
-
-In Redux, every action should be a FSA-compliant, we prefer to keep it that way. You can add middleware between bridges to put a custom tag on actions.
+We support multiple bridges. In rare cases, you may want to tag unfolded actions from multiple bridges. You can write a middleware between bridges to tag actions.
 
 ```js
 const createStoreWithMiddleware = applyMiddleware(
   ReduxWebSocketBridge('ws://localhost:4000/'),
   store => next => action => {
     if (action === 'SERVER/GREETING') {
-      action = { ...action, payload: { from: 'server1', ...action.payload } };
+      action = { ...action, meta: { from: 'server1', ...action.meta } };
     }
 
     next(action);
@@ -215,7 +213,7 @@ const createStoreWithMiddleware = applyMiddleware(
   ReduxWebSocketBridge('ws://localhost:4001/'),
   store => next => action => {
     if (action === 'SERVER/GREETING') {
-      action = { ...action, payload: { from: 'server2', ...action.payload } };
+      action = { ...action, meta: { from: 'server2', ...action.meta } };
     }
 
     next(action);
@@ -223,17 +221,19 @@ const createStoreWithMiddleware = applyMiddleware(
 )(createStore);
 ```
 
-In this example, we added two middleware to tag all `SERVER/GREETING` action, adding a `from` property to `payload` to indicate if it is from `server1` or `server2`. Note the order of spread/rest property matters, we will not overriding `payload.from` if already there.
+> For clarity, we did not refactor the sample code.
 
-You can refactor the code out and use `RegExp` for matching action types.
+In this example, we added two middleware to tag all `SERVER/GREETING` action, adding a `meta.from` property indicate where the action was from. Note the order of spread/rest property matters, we will not overriding `meta.from` if it was already defined.
 
-If this sample doesn't works for you, please do [let us know](https://github.com/compulim/redux-websocket-action-bridge/issues).
+You can refactor the code out and use `RegExp` for pattern-matching action types.
+
+If this sample does not works for you, please do [let us know](https://github.com/compulim/redux-websocket-action-bridge/issues).
 
 ### Delayed connection setup
 
-Some services requires calling their REST API before setting up a WebSocket connection, for example, on Slack, you need to call [`rtm.connect`](https://api.slack.com/methods/rtm.connect) to get the endpoint for WebSocket RTM API.
+Some services requires calling their REST API before setting up a WebSocket connection, for example, Slack requires a handshake call [`rtm.connect`](https://api.slack.com/methods/rtm.connect) to get the endpoint for their WebSocket RTM API.
 
-You can create a WebSocket-alike to do the REST API handshake. Once your handshake is done, you can then establish the WebSocket connection. You will need to proxy events. But since the bridge prefer `onopen` than `addEventListener`, the effort is minimal.
+You can create a WebSocket-alike to do the REST API handshake. Once your handshake is done, you can then establish the WebSocket connection. You will need to proxy events before the connection is made. But since the bridge prefer `onopen` than `addEventListener`, the effort is minimal.
 
 ## Options
 
