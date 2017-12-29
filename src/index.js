@@ -1,10 +1,10 @@
 import blobToArrayBuffer from './blobToArrayBuffer';
 import isFSA             from './isFSA';
 
-export const CLOSE = `CLOSE`;
+export const CLOSE   = `CLOSE`;
 export const MESSAGE = `MESSAGE`;
-export const OPEN = `OPEN`;
-export const SEND = `SEND`;
+export const OPEN    = `OPEN`;
+export const SEND    = `SEND`;
 
 export function close() {
   return { type: CLOSE };
@@ -20,8 +20,8 @@ export function open() {
 
 const DEFAULT_OPTIONS = {
   actionPrefix: '@@websocket/',
-  binaryType: 'arrayBuffer',
-  unfold: false
+  binaryType  : 'arrayBuffer',
+  unfold      : false
 };
 
 export default function createWebSocketMiddleware(urlOrFactory, options = DEFAULT_OPTIONS) {
@@ -43,9 +43,9 @@ export default function createWebSocketMiddleware(urlOrFactory, options = DEFAUL
     ws.onmessage = event => {
       let getPayload;
 
-      if (options.binaryType === 'arrayBuffer' && event.data instanceof Blob) {
+      if (typeof Blob !== 'undefined' && options.binaryType === 'arrayBuffer' && event.data instanceof Blob) {
         getPayload = blobToArrayBuffer(event.data);
-      } else if (options.binaryType === 'blob' && event.data instanceof ArrayBuffer) {
+      } else if (typeof ArrayBuffer !== 'undefined' && options.binaryType === 'blob' && event.data instanceof ArrayBuffer) {
         getPayload = new Blob([event.data]);
       } else {
         // We make this a Promise because we might want to keep the sequence of dispatch, @@websocket/MESSAGE first, then unfold later.
@@ -53,16 +53,16 @@ export default function createWebSocketMiddleware(urlOrFactory, options = DEFAUL
       }
 
       getPayload.then(payload => {
-        store.dispatch({
-          type: `${ actionPrefix }${ MESSAGE }`,
-          payload
-        });
-
         if (typeof payload === 'string' && options.unfold) {
           const action = tryParseJSON(payload);
 
           // TODO: Consider optional prefix to incoming actions
           isFSA(action) && store.dispatch(action);
+        } else {
+          store.dispatch({
+            type: `${ actionPrefix }${ MESSAGE }`,
+            payload
+          });
         }
       });
     }
@@ -72,7 +72,6 @@ export default function createWebSocketMiddleware(urlOrFactory, options = DEFAUL
         let { payload } = action;
 
         if (options.unfold && isFSA(payload)) {
-          store.dispatch(payload);
           ws.send(JSON.stringify(payload));
         } else {
           ws.send(payload);
