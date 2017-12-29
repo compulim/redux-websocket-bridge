@@ -1,4 +1,4 @@
-# Dispatch WebSocket messages into Redux
+# Bridge WebSocket messages and Redux actions
 
 Inspired by [redux-websocket](https://github.com/giantmachines/redux-websocket).
 
