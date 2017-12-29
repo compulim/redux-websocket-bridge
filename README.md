@@ -7,6 +7,16 @@ This bridge middleware will:
 * Dispatch WebSocket messages into Redux store
 * Lift Redux action to WebSocket
 
+## Introduction
+
+WebSocket provides a full duplex connection. On top of request-response model, the server can watch-and-push to the browser continuously. But comparing coding effort between REST and WebSocket, fetching data using REST is much simpler.
+
+We want to reduce the effort to write APIs exposed thru WebSocket.
+
+By combining WebSocket and Flux architecture (Redux), we found that the coding effort can be dramatically lowered to a level comparable to traditional REST APIs.
+
+Thus, we made Redux WebSocket bridge. It promotes WebSocket messages to a first-class citizen in Flux architecture, enabling front end developers with less knowledge on WebSocket to work with new collaborative and reactive services.
+
 ## How to use
 
 * [Add middleware to your store](#store-adding-middleware)
