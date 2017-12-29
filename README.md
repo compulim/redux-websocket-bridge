@@ -229,9 +229,9 @@ If this sample doesn't works for you, please do [let us know](https://github.com
 
 | Name | Description | Default |
 | - | - | - |
-| `actionPrefix` | Action prefix for all system messages | `"@@websocket/"` |
 | `binaryType` | Convert binary to `"arraybuffer"` or `"blob"` | `null` |
-| `unfold` | Unfold messages as actions if they are JSON and look like a [Flux Standard Action](https://github.com/acdlite/flux-standard-action), and vice versa | `true` |
+| `namespace` | Action prefix for all system messages | `"@@websocket/"` |
+| `unfold` | Unfold messages as actions if they are JSON and look like a [Flux Standard Action](https://github.com/acdlite/flux-standard-action) | `true` |
 
 ## Contributions
 
