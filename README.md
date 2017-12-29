@@ -1,4 +1,4 @@
-# Unfolds and dispatches WebSocket messages into Redux store
+# Unfolds and dispatches WebSocket messages into Redux
 
 Inspired by [redux-websocket](https://github.com/giantmachines/redux-websocket).
 
@@ -13,11 +13,11 @@ This bridge middleware will:
 
 ## How to use
 
-* Add middleware to your [store](#adding-middleware-to-store)
-* Handle incoming messages in [reducer](#handling-incoming-messages-in-reducer)
-* Send WebSocket messages thru [action](#sending-websocket-messages-thru-action)
+* [Add middleware to your store](#store-adding-middleware)
+* [Handle incoming messages in reducer](#reducer-handling-incoming-messages)
+* [Send WebSocket messages thru action](#action-sending-websocket-messages)
 
-### Adding middleware to store
+### Store: adding middleware
 
 ```js
 import { applyMiddleware, createStore } from 'redux';
@@ -32,7 +32,7 @@ export default createStoreWithMiddleware(...);
 
 > Tips: you can use [`namespace`](#options) to add multiple `ReduxWebSocketBridge`
 
-### Handling incoming messages in reducer
+### Reducer: handling incoming messages
 
 With unfolding enabled, when you receive any WebSocket messages that resembles a [Flux Standard Action](https://github.com/acdlite/flux-standard-action) (FSA) in JSON, it will automatically parsed and dispatched to the store.
 
@@ -90,7 +90,7 @@ function serverConnectivity(state = {}, action) {
 }
 ```
 
-### Sending WebSocket messages thru action
+### Action: sending WebSocket messages
 
 There are two ways to send WebSocket messages:
 
@@ -150,6 +150,7 @@ ws.send(JSON.stringify({
   * [WebSocket APIs used by the bridge](#websocket-apis-used-by-the-bridge)
 * [Prefer `ArrayBuffer`](#prefer-arraybuffer)
 * [Reconnection logic](#reconnection-logic)
+* [Unfolding actions from multiple bridges](#unfolding-actions-from-multiple-bridges)
 
 ### Use SockJS or other implementations
 
@@ -191,13 +192,46 @@ To implement your own reconnection logic, you can create a new WebSocket-alike. 
 
 Although you are recommended to fully implement the [WebSocket API](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket), you can check out [list of APIs](#websocket-apis-used-by-the-bridge) that is required by the bridge.
 
+### Unfolding actions from multiple bridges
+
+We support multiple bridges. In rare cases, you may be unfolding action with same action type from multiple bridges, and you want to differentiate them.
+
+In Redux, every action should be a FSA-compliant, we prefer to keep it that way. You can add middleware between bridges to tag messages from them.
+
+```js
+const createStoreWithMiddleware = applyMiddleware(
+  ReduxWebSocketBridge('ws://localhost:4000/'),
+  store => next => action => {
+    if (action === 'SERVER/GREETING') {
+      action = { ...action, payload: { from: 'server1', ...action.payload } };
+    }
+
+    next(action);
+  },
+  ReduxWebSocketBridge('ws://localhost:4001/'),
+  store => next => action => {
+    if (action === 'SERVER/GREETING') {
+      action = { ...action, payload: { from: 'server2', ...action.payload } };
+    }
+
+    next(action);
+  },
+)(createStore);
+```
+
+In this example, we added two middleware to tag all `SERVER/GREETING` action, adding a `from` property to `payload` to indicate if it is from `server1` or `server2`. Note the order of spread/rest property matters, we will not overriding `payload.from` if already there.
+
+You can refactor the code out and use `RegExp` for matching action types.
+
+If this sample doesn't works for you, please do [let us know](https://github.com/compulim/redux-websocket-action-bridge/issues).
+
 ## Options
 
 | Name | Description | Default |
 | - | - | - |
 | `actionPrefix` | Action prefix for all system messages | `"@@websocket/"` |
 | `binaryType` | Convert binary to `"arraybuffer"` or `"blob"` | `null` |
-| `unfold` | Unfold messages as actions if they are JSON and look like a [Flux Standard Action](https://github.com/acdlite/flux-standard-action), and vice versa | `false` |
+| `unfold` | Unfold messages as actions if they are JSON and look like a [Flux Standard Action](https://github.com/acdlite/flux-standard-action), and vice versa | `true` |
 
 ## Contributions
 
