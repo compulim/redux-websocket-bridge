@@ -1,15 +1,11 @@
-# Unfolds and dispatches WebSocket messages into Redux
+# Dispatch WebSocket messages into Redux
 
 Inspired by [redux-websocket](https://github.com/giantmachines/redux-websocket).
 
 This bridge middleware will:
 
-* Dispatches WebSocket messages into Redux store
-  * Unfold as a Redux action
-  * As `@@websocket/MESSAGE`, `payload` could be text or binary
-* Pumps Redux action payload to WebSocket
-  * Set `send` to `true` to any action
-  * Thru `@@websocket/SEND` action, `payload` will send as-is
+* Dispatch WebSocket messages into Redux store
+* Lift Redux action to WebSocket
 
 ## How to use
 
@@ -24,7 +20,7 @@ import { applyMiddleware, createStore } from 'redux';
 import ReduxWebSocketBridge from 'redux-websocket-bridge';
 
 const createStoreWithMiddleware = applyMiddleware(
-  ReduxWebSocketBridge('ws://localhost:4000/', { unfold: true })
+  ReduxWebSocketBridge('ws://localhost:4000/')
 )(createStore);
 
 export default createStoreWithMiddleware(...);
@@ -34,11 +30,11 @@ export default createStoreWithMiddleware(...);
 
 ### Reducer: handling incoming messages
 
-With unfolding enabled, when you receive any WebSocket messages that resembles a [Flux Standard Action](https://github.com/acdlite/flux-standard-action) (FSA) in JSON, it will automatically parsed and dispatched to the store.
+When you receive any WebSocket messages that resembles a [Flux Standard Action](https://github.com/acdlite/flux-standard-action) (FSA) in JSON, it will automatically parsed and dispatched to the store. We call this "unfold".
 
 #### Server code
 
-When the server send a JSON message that looks like a FSA, it will automatically unfolded and dispatch to the store.
+When the server send a JSON message that looks like a FSA, it will be automatically unfolded and dispatch to the store.
 
 ```js
 app.on('connection', socket => {
@@ -55,7 +51,7 @@ app.on('connection', socket => {
 function reducer(state = {}, action) {
   switch (action.type) {
   case 'SERVER/GREETING':
-    return { ...state, connected: true };
+    return { ...state, ...action.payload, connected: true };
 
   default: break;
   }
@@ -64,7 +60,7 @@ function reducer(state = {}, action) {
 
 #### Handling WebSocket events
 
-For WebSocket events, they will be dispatched thru `@@websocket/*.
+For WebSocket events, they will be dispatched thru `@@websocket/*`.
 
 ```js
 import { OPEN, CLOSE, MESSAGE } from 'redux-websocket-bridge';
@@ -121,13 +117,13 @@ function sendHelloWorld() {
 
 #### Sending action as JSON
 
-You can also opt-in to send any action dispatched to your store thru WebSocket. On the action object, set `send` to `true` (or your namespace). When you dispatch the action, the bridge will also `JSON.stringify` and send the action to WebSocket.
+You can also opt-in to send any action dispatched to your store thru WebSocket. On the action object, set `send` to `true` (or your namespace). When you dispatch the action, the bridge will also `JSON.stringify` and send a copy of the action to WebSocket.
 
 ```js
 this.props.dispatch({
   type: 'CLIENT/SIGN_IN',
   payload: { token: 'my very secret token' },
-  send: true
+  send: true // or '@@websocket'
 });
 ```
 
@@ -140,8 +136,6 @@ ws.send(JSON.stringify({
 }));
 ```
 
-> Tips: if you have multiple bridges, you can set `send` to `@@websocket` to send thru only the bridge with the same namespace.
-
 > What-if: if your action is not a FSA-compliant, we will still send it thru. This behavior may change in the future.
 
 ## Advanced topics
@@ -151,6 +145,7 @@ ws.send(JSON.stringify({
 * [Prefer `ArrayBuffer`](#prefer-arraybuffer)
 * [Reconnection logic](#reconnection-logic)
 * [Unfolding actions from multiple bridges](#unfolding-actions-from-multiple-bridges)
+* [Delayed connectoin setup](#delayed-connection-setup)
 
 ### Use SockJS or other implementations
 
@@ -166,19 +161,24 @@ const createStoreWithMiddleware = applyMiddleware(
 
 #### WebSocket APIs used by the bridge
 
-If you are unsure if your WebSocket implementation will work on the bridge or not, check it against the list of required WebSocket APIs list below:
+Your WebSocket implementation will work on the bridge if they implemented the interface below:
 
-* `onopen`
-* `onclose`
-* `onmessage(event)`
-  * `event.data`
-    * Unfold enabled: it should support returning `string`
-* `send`
-  * Unfold enabled: it should support sending `string`
+```typescript
+interface WebSocket {
+  onopen();
+  onclose();
+  onmessage(event: { data: string });
+  send(data: string);
+}
+```
+
+> We currently do not process `onerror`, we might add it in near future.
 
 ### Prefer `ArrayBuffer`
 
-WebSocket standard support sending binary data. But receiving binary data means you might be receiving either `ArrayBuffer` or `Blob`, depends on your [WebSocket implementation](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket).
+> This feature is for browser only, it requires `FileReader` API
+
+WebSocket support binary message. But receiving binary data means you might be receiving either `ArrayBuffer` or `Blob`, depends on your [WebSocket implementation](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket).
 
 For your convenience, if you set `binaryType` to `arraybuffer` in [options](#options), we will convert all `Blob` to `ArrayBuffer` before dispatching it to Redux store. Because the conversion is an asynchronous operation (using `FileReader`), it is easier for the bridge to convert it for you.
 
@@ -188,15 +188,15 @@ Vice versa, if you set `binaryType` to `blob`, we will convert all `ArrayBuffer`
 
 For simplicity, the bridge does not have any reconnection mechanism. But it is simple to implement one, thanks to simple WebSocket API.
 
-To implement your own reconnection logic, you can create a new WebSocket-alike. When disconnected, your implementation will recreate a new WebSocket object. You will be managing the lifetime of WebSocket objects and event subscription.
+To implement your own reconnection logic, you can create a new WebSocket-alike. When disconnected, your implementation will recreate a new WebSocket object. You will be managing the lifetime of WebSocket objects and event subscriptions.
 
-Although you are recommended to fully implement the [WebSocket API](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket), you can check out [list of APIs](#websocket-apis-used-by-the-bridge) that is required by the bridge.
+Although you are recommended to fully implement the [WebSocket API](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket), you can check out the [subset](#websocket-apis-used-by-the-bridge) required by the bridge.
 
 ### Unfolding actions from multiple bridges
 
-We support multiple bridges. In rare cases, you may be unfolding action with same action type from multiple bridges, and you want to differentiate them.
+We support multiple bridges. In rare cases, you may want to tag unfolded actions from multiple bridges.
 
-In Redux, every action should be a FSA-compliant, we prefer to keep it that way. You can add middleware between bridges to tag messages from them.
+In Redux, every action should be a FSA-compliant, we prefer to keep it that way. You can add middleware between bridges to put a custom tag on actions.
 
 ```js
 const createStoreWithMiddleware = applyMiddleware(
@@ -224,6 +224,12 @@ In this example, we added two middleware to tag all `SERVER/GREETING` action, ad
 You can refactor the code out and use `RegExp` for matching action types.
 
 If this sample doesn't works for you, please do [let us know](https://github.com/compulim/redux-websocket-action-bridge/issues).
+
+### Delayed connection setup
+
+Some services requires calling their REST API before setting up a WebSocket connection, for example, on Slack, you need to call [`rtm.connect`](https://api.slack.com/methods/rtm.connect) to get the endpoint for WebSocket RTM API.
+
+You can create a WebSocket-alike to do the REST API handshake. Once your handshake is done, you can then establish the WebSocket connection. You will need to proxy events. But since the bridge prefer `onopen` than `addEventListener`, the effort is minimal.
 
 ## Options
 
