@@ -127,8 +127,6 @@ function sendHelloWorld() {
 
 #### Sending action as JSON
 
-> Using this feature will make your action not complies with FSA.
-
 You can also opt-in to send any action dispatched to your store thru WebSocket. On the action object, set `meta.send` to `true` (or your namespace). When you dispatch the action, the bridge will also `JSON.stringify` and send a copy of the action to WebSocket.
 
 ```js
