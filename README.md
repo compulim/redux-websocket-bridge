@@ -157,7 +157,7 @@ ws.send(JSON.stringify({
 * [Prefer `ArrayBuffer`](#prefer-arraybuffer)
 * [Reconnection logic](#reconnection-logic)
 * [Unfolding actions from multiple bridges](#unfolding-actions-from-multiple-bridges)
-* [Delayed connectoin setup](#delayed-connection-setup)
+* [Delayed connection setup](#delayed-connection-setup)
 
 ### Use SockJS or other implementations
 
