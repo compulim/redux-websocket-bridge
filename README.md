@@ -1,5 +1,7 @@
 # Bridge WebSocket messages and Redux actions
 
+[![npm version](https://badge.fury.io/js/redux-websocket-bridge.svg)](https://badge.fury.io/js/redux-websocket-bridge) [![Build Status](https://travis-ci.org/compulim/redux-websocket-bridge.svg?branch=master)](https://travis-ci.org/compulim/redux-websocket-bridge)
+
 Inspired by [redux-websocket](https://github.com/giantmachines/redux-websocket).
 
 This bridge middleware will:
