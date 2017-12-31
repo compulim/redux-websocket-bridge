@@ -7,7 +7,7 @@ Inspired by [redux-websocket](https://github.com/giantmachines/redux-websocket).
 This bridge middleware will:
 
 * Dispatch WebSocket messages into Redux store
-* Lift Redux action to WebSocket
+* Lift Redux actions to WebSocket
 
 ## Introduction
 
