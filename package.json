@@ -7,16 +7,23 @@
   "files": [
     "lib/*"
   ],
-  "scripts": {
-    "build": "babel ./src --out-dir ./lib --source-maps --ignore *.spec.js,*.test.js",
-    "prepare": "rimraf lib && npm run build",
-    "test": "jest"
-  },
   "author": {
     "email": "compulim@hotmail.com",
     "name": "William Wong"
   },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/compulim/redux-websocket-bridge.git"
+  },
+  "keywords": [
+    "bridge",
+    "redux",
+    "websocket"
+  ],
+  "bugs": {
+    "url": "https://github.com/compulim/redux-websocket-bridge/issues"
+  },
   "devDependencies": {
     "babel-cli": "^6.26.0",
     "babel-core": "^6.26.0",
@@ -25,5 +32,10 @@
     "jest": "^22.0.4",
     "redux": "^3.7.2",
     "rimraf": "^2.6.2"
+  },
+  "scripts": {
+    "build": "babel ./src --out-dir ./lib --source-maps --ignore *.spec.js,*.test.js",
+    "prepare": "rimraf lib && npm run build",
+    "test": "jest"
   }
 }
