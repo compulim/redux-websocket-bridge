@@ -1,4 +1,4 @@
-lib
-node_modules
+/lib
+/node_modules
 
-redux-websocket-bridge-*.tgz
+/redux-websocket-bridge-*.tgz

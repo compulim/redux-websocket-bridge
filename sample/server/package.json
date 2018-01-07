@@ -1,0 +1,32 @@
+{
+  "name": "redux-websocket-bridge-sample",
+  "version": "1.0.0",
+  "description": "",
+  "main": "lib/index.js",
+  "scripts": {
+    "build": "babel src --out-dir lib",
+    "start": "node .",
+    "test": "jest"
+  },
+  "files": [
+    "lib/**/*"
+  ],
+  "author": {
+    "email": "compulim@hotmail.com",
+    "name": "William Wong",
+    "url": "http://compulim.info/"
+  },
+  "license": "MIT",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/compulim/redux-websocket-bridge-sample.git"
+  },
+  "dependencies": {
+    "redux": "^3.7.2",
+    "redux-saga": "^0.16.0",
+    "redux-websocket-bridge": "0.1.0-1",
+    "ws": "^4.0.0"
+  },
+  "devDependencies": {}
+}
