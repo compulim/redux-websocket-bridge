@@ -9,7 +9,7 @@ test('should handle onopen', () => {
   const ws = {};
   const store = createStoreWithBridge(ws, (state = {}, action) => {
     if (action.type === `@@websocket/${ OPEN }`) {
-      state = { ...state, connected: true };
+      state = { ...state, connected: true, from: action.meta.webSocket };
     }
 
     return state;
@@ -18,13 +18,14 @@ test('should handle onopen', () => {
   ws.onopen();
 
   expect(store.getState()).toHaveProperty('connected', true);
+  expect(store.getState()).toHaveProperty('from', ws);
 });
 
 test('should handle onclose', () => {
   const ws = {};
   const store = createStoreWithBridge(ws, (state = {}, action) => {
     if (action.type === `@@websocket/${ CLOSE }`) {
-      state = { ...state, connected: false };
+      state = { ...state, connected: false, from: action.meta.webSocket };
     }
 
     return state;
@@ -34,13 +35,14 @@ test('should handle onclose', () => {
   ws.onclose();
 
   expect(store.getState()).toHaveProperty('connected', false);
+  expect(store.getState()).toHaveProperty('from', ws);
 });
 
 test('should emit message', async () => {
   const ws = {};
   const store = createStoreWithBridge(ws, (state = {}, action) => {
     if (action.type === `@@websocket/${ MESSAGE }`) {
-      state = { ...state, message: action.payload };
+      state = { ...state, message: action.payload, from: action.meta.webSocket };
     }
 
     return state;
@@ -53,6 +55,7 @@ test('should emit message', async () => {
   await Promise.resolve();
 
   expect(store.getState()).toHaveProperty('message', 'Hello, World!');
+  expect(store.getState()).toHaveProperty('from', ws);
 });
 
 test('should unfold message', async () => {
@@ -82,11 +85,10 @@ test('should unfold message', async () => {
   // TODO: Find better way to sleep
   await Promise.resolve();
 
-  expect(store.getState()).toEqual({
-    protocol: 1,
-    userID: 'u-12345',
-    token: 't-abcde'
-  });
+  expect(store.getState()).toHaveProperty('protocol', 1);
+  expect(store.getState()).toHaveProperty('userID', 'u-12345');
+  expect(store.getState()).toHaveProperty('token', 't-abcde');
+  expect(store.getState()).toHaveProperty('webSocket', ws);
 });
 
 test('should send raw text', () => {
@@ -228,7 +230,7 @@ test('should send namespaced action', () => {
 
   store.dispatch({
     type: 'SERVER/SIGN_IN',
-    meta: { send: 'SERVER2/' },
+    meta: { send: ws2 },
     payload: {
       userID: 'u-98765',
       token: 't-zyxwv'

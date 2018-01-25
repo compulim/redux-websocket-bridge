@@ -63,6 +63,7 @@ app.on('connection', socket => {
 function reducer(state = {}, action) {
   switch (action.type) {
   case 'SERVER/GREETING':
+    // action.meta.webSocket reference to the WebSocket object
     return { ...state, ...action.payload, connected: true };
 
   default: break;
@@ -119,7 +120,7 @@ function sendHelloWorld() {
     type: `@@websocket/${ SEND }`,
     payload: JSON.stringify({
       id: 1,
-      type: ' message',
+      type: 'message',
       channel: 'C024BE91L',
       text: 'Hello world'
     })
@@ -134,7 +135,7 @@ You can also opt-in to send any action dispatched to your store thru WebSocket. 
 ```js
 this.props.dispatch({
   type: 'CLIENT/SIGN_IN',
-  meta: { send: true } // or '@@websocket',
+  meta: { send: true } // or '@@websocket', or a WebSocket object,
   payload: { token: 'my very secret token' }
 });
 ```

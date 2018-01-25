@@ -31,17 +31,17 @@ export default function createWebSocketMiddleware(urlOrFactory, options = DEFAUL
   const { namespace } = options;
 
   return store => {
-    let ws;
+    let webSocket;
 
     if (typeof urlOrFactory === 'function') {
-      ws = urlOrFactory();
+      webSocket = urlOrFactory();
     } else {
-      ws = new WebSocket(urlOrFactory);
+      webSocket = new WebSocket(urlOrFactory);
     }
 
-    ws.onopen = () => store.dispatch({ type: `${ namespace }${ OPEN }` });
-    ws.onclose = () => store.dispatch({ type: `${ namespace }${ CLOSE }` });
-    ws.onmessage = event => {
+    webSocket.onopen = () => store.dispatch({ type: `${ namespace }${ OPEN }`, meta: { webSocket } });
+    webSocket.onclose = () => store.dispatch({ type: `${ namespace }${ CLOSE }`, meta: { webSocket } });
+    webSocket.onmessage = event => {
       let getPayload;
 
       if (typeof Blob !== 'undefined' && options.binaryType === 'arraybuffer' && event.data instanceof Blob) {
@@ -59,12 +59,19 @@ export default function createWebSocketMiddleware(urlOrFactory, options = DEFAUL
 
           // TODO: Consider optional prefix to incoming actions
           if (isFSA(action)) {
-            return store.dispatch(action);
+            return store.dispatch({
+              ...action,
+              meta: {
+                ...action.meta,
+                webSocket
+              }
+            });
           }
         }
 
         store.dispatch({
           type: `${ namespace }${ MESSAGE }`,
+          meta: { webSocket },
           payload
         });
       });
@@ -72,14 +79,18 @@ export default function createWebSocketMiddleware(urlOrFactory, options = DEFAUL
 
     return next => action => {
       if (action.type === `${ namespace }${ SEND }`) {
-        ws.send(action.payload);
-      } else if (action.meta && (action.meta.send === true || action.meta.send === namespace)) {
-        const sendAction = {
-          ...action,
-          meta: { ...action.meta, send: undefined }
-        };
+        webSocket.send(action.payload);
+      } else if (
+        action.meta
+        && (
+          action.meta.send === true
+          || action.meta.send === namespace
+          || action.meta.send === webSocket
+        )
+      ) {
+        const { send, ...meta } = action.meta;
 
-        ws.send(JSON.stringify(sendAction));
+        webSocket.send(JSON.stringify({ ...action, meta }));
       }
 
       return next(action);
