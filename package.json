@@ -37,5 +37,8 @@
     "build": "babel ./src --out-dir ./lib --source-maps --ignore *.spec.js,*.test.js",
     "prepare": "rimraf lib && npm run build",
     "test": "jest"
+  },
+  "dependencies": {
+    "minimatch": "^3.0.4"
   }
 }

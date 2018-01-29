@@ -1,3 +1,5 @@
+import minimatch         from 'minimatch';
+
 import blobToArrayBuffer from './blobToArrayBuffer';
 import isFSA             from './isFSA';
 
@@ -20,13 +22,59 @@ export function open() {
 
 const DEFAULT_OPTIONS = {
   binaryType: 'arraybuffer',
+  meta      : {
+    from: true
+  },
   namespace : '@@websocket/',
+  tags      : [],
   unfold    : true
 };
+
+function defaultUnfold(payload, webSocket, options) {
+  if (typeof payload === 'string') {
+    const action = tryParseJSON(payload);
+
+    // TODO: Consider optional prefix to incoming actions
+    if (isFSA(action)) {
+      const meta = { ...action.meta, ...options.meta };
+
+      if (options.meta.from === true) {
+        meta.from = webSocket;
+      } else if (options.meta.from) {
+        meta.from = options.meta.from;
+      } else {
+        delete meta.from;
+      }
+
+      return {
+        ...action,
+        meta
+      };
+    }
+  }
+}
+
+function sendPredicate(sendMeta, webSocket, options) {
+  if (!sendMeta) {
+    return false;
+  }
+
+  sendMeta = Array.isArray(sendMeta) ? sendMeta : [sendMeta];
+
+  return sendMeta.some(sendMeta =>
+    sendMeta === true
+    || sendMeta === webSocket
+    || (options.tags || []).some(tag => {
+      return typeof sendMeta === 'string' && minimatch(tag, sendMeta, { matchBase: true });
+    })
+  );
+}
 
 export default function createWebSocketMiddleware(urlOrFactory, options = DEFAULT_OPTIONS) {
   options = { ...DEFAULT_OPTIONS, ...options };
   options.binaryType = options.binaryType.toLowerCase();
+  options.tags = Array.isArray(options.tags) ? options.tags : [options.tags];
+  options.unfold = options.unfold && (typeof options.unfold === 'function' ? options.unfold : defaultUnfold);
 
   const { namespace } = options;
 
@@ -54,18 +102,11 @@ export default function createWebSocketMiddleware(urlOrFactory, options = DEFAUL
       }
 
       getPayload.then(payload => {
-        if (typeof payload === 'string' && options.unfold) {
-          const action = tryParseJSON(payload);
+        if (options.unfold) {
+          const action = options.unfold(payload, webSocket, options);
 
-          // TODO: Consider optional prefix to incoming actions
-          if (isFSA(action)) {
-            return store.dispatch({
-              ...action,
-              meta: {
-                ...action.meta,
-                webSocket
-              }
-            });
+          if (action) {
+            return store.dispatch(action);
           }
         }
 
@@ -80,17 +121,14 @@ export default function createWebSocketMiddleware(urlOrFactory, options = DEFAUL
     return next => action => {
       if (action.type === `${ namespace }${ SEND }`) {
         webSocket.send(action.payload);
-      } else if (
-        action.meta
-        && (
-          action.meta.send === true
-          || action.meta.send === namespace
-          || action.meta.send === webSocket
-        )
-      ) {
-        const { send, ...meta } = action.meta;
+      } else if (action.meta && sendPredicate(action.meta.send, webSocket, options)) {
+        const { meta, ...actionToSend } = action;
+        const { send, ...metaToSend } = meta;
 
-        webSocket.send(JSON.stringify({ ...action, meta }));
+        webSocket.send(JSON.stringify({
+          ...actionToSend,
+          ...Object.keys(metaToSend).length ? { meta: metaToSend } : {}
+        }));
       }
 
       return next(action);

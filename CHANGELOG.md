@@ -1,6 +1,16 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- `options.meta`, to merge custom `meta` to every actions unfolded
+  - `options.meta.from`:
+    - `true`, to add the WebSocket object
+    - `false`, to not add anything into `meta`
+    - otherwise, add to `meta` as-is
+- `options.tags` of `string[]`, indicates what actions this bridge is interested
+- `send` meta property changes, must be a string
+  - [`minimatch`](https://npmjs.com/package/minimatch) against `options.tags`
+  - No longer match against `options.namespace`
 
 ## [0.2.0-0] - 2018-01-25
 ### Added

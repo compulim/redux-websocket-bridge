@@ -1,8 +1,8 @@
 import { applyMiddleware, createStore } from 'redux';
 import ReduxWebSocketBridge, { CLOSE, MESSAGE, OPEN } from '.';
 
-function createStoreWithBridge(ws, reducer) {
-  return applyMiddleware(ReduxWebSocketBridge(() => ws))(createStore)(reducer || ((state = {}) => state));
+function createStoreWithBridge(ws, reducer, options) {
+  return applyMiddleware(ReduxWebSocketBridge(() => ws, options))(createStore)(reducer || ((state = {}) => state));
 }
 
 test('should handle onopen', () => {
@@ -88,7 +88,49 @@ test('should unfold message', async () => {
   expect(store.getState()).toHaveProperty('protocol', 1);
   expect(store.getState()).toHaveProperty('userID', 'u-12345');
   expect(store.getState()).toHaveProperty('token', 't-abcde');
-  expect(store.getState()).toHaveProperty('webSocket', ws);
+  expect(store.getState()).toHaveProperty('from', ws);
+});
+
+test('should unfold with a custom "from" meta', async () => {
+  const ws = {};
+  const store = createStoreWithBridge(ws, (state = {}, action) => {
+    if (action.type === 'HELLO') {
+      state = { ...state, ...action.meta };
+    }
+
+    return state;
+  }, {
+    meta: { from: 'HAWAII' }
+  });
+
+  ws.onopen();
+  ws.onmessage({ data: JSON.stringify({ type: 'HELLO' }) });
+
+  // TODO: Find better way to sleep
+  await Promise.resolve();
+
+  expect(store.getState()).toHaveProperty('from', 'HAWAII');
+});
+
+test('should unfold with "from" meta set to false', async () => {
+  const ws = {};
+  const store = createStoreWithBridge(ws, (state = {}, action) => {
+    if (action.type === 'HELLO') {
+      state = { ...state, ...action.meta };
+    }
+
+    return state;
+  }, {
+    meta: { from: false }
+  });
+
+  ws.onopen();
+  ws.onmessage({ data: JSON.stringify({ type: 'HELLO' }) });
+
+  // TODO: Find better way to sleep
+  await Promise.resolve();
+
+  expect(store.getState()).not.toHaveProperty('from');
 });
 
 test('should send raw text', () => {
@@ -145,7 +187,6 @@ test('should send action', () => {
 
   expect(send).toHaveBeenCalledWith(JSON.stringify({
     type: 'SERVER/SIGN_IN',
-    meta: {},
     payload: {
       userID: 'u-12345',
       token: 't-abcde'
@@ -195,14 +236,14 @@ test('should namespace WebSocket events', async () => {
   expect(store.getState()).toEqual({ server1: false, server2: false });
 });
 
-test('should send namespaced action', () => {
+test('should send targeted action', () => {
   const send1 = jest.fn();
   const send2 = jest.fn();
   const ws1 = { send: send1 };
   const ws2 = { send: send2 };
   const store = applyMiddleware(
-    ReduxWebSocketBridge(() => ws1, { namespace: 'SERVER1/' }),
-    ReduxWebSocketBridge(() => ws2, { namespace: 'SERVER2/' })
+    ReduxWebSocketBridge(() => ws1, { tags: ['SERVER/1/NODE'] }),
+    ReduxWebSocketBridge(() => ws2, { tags: ['SERVER/2/BROWSER'] })
   )(createStore)((state = {}) => state);
 
   ws1.onopen();
@@ -210,7 +251,7 @@ test('should send namespaced action', () => {
 
   store.dispatch({
     type: 'SERVER/SIGN_IN',
-    meta: { send: 'SERVER1/' },
+    meta: { send: 'SERVER/1/NODE' },
     payload: {
       userID: 'u-12345',
       token: 't-abcde'
@@ -219,7 +260,6 @@ test('should send namespaced action', () => {
 
   expect(send1).toHaveBeenCalledWith(JSON.stringify({
     type: 'SERVER/SIGN_IN',
-    meta: {},
     payload: {
       userID: 'u-12345',
       token: 't-abcde'
@@ -239,7 +279,6 @@ test('should send namespaced action', () => {
 
   expect(send2).toHaveBeenCalledWith(JSON.stringify({
     type: 'SERVER/SIGN_IN',
-    meta: {},
     payload: {
       userID: 'u-98765',
       token: 't-zyxwv'
@@ -251,6 +290,87 @@ test('should send namespaced action', () => {
     meta: { send: true }
   });
 
-  expect(send1).toHaveBeenCalledWith(JSON.stringify({ type: 'SERVER/PING', meta: {} }));
-  expect(send2).toHaveBeenCalledWith(JSON.stringify({ type: 'SERVER/PING', meta: {} }));
+  expect(send1).toHaveBeenCalledWith(JSON.stringify({ type: 'SERVER/PING' }));
+  expect(send2).toHaveBeenCalledWith(JSON.stringify({ type: 'SERVER/PING' }));
+});
+
+test('should send to string "tags"', () => {
+  const send1 = jest.fn();
+  const send2 = jest.fn();
+  const ws1 = { send: send1 };
+  const ws2 = { send: send2 };
+  const store = applyMiddleware(
+    ReduxWebSocketBridge(() => ws1, { tags: 'SERVER/1/NODE' }),
+    ReduxWebSocketBridge(() => ws2, {})
+  )(createStore)((state = {}) => state);
+
+  ws1.onopen();
+  ws2.onopen();
+
+  store.dispatch({ type: 'HELLO', meta: { send: 'SERVER/1/NODE' } });
+
+  expect(send1).toHaveBeenCalledWith(JSON.stringify({ type: 'HELLO' }));
+  expect(send2).toHaveBeenCalledTimes(0);
+});
+
+test('should send to minimatch "tags"', () => {
+  const send1 = jest.fn();
+  const send2 = jest.fn();
+  const ws1 = { send: send1 };
+  const ws2 = { send: send2 };
+  const store = applyMiddleware(
+    ReduxWebSocketBridge(() => ws1, { tags: 'SERVER/1/NODE' }),
+    ReduxWebSocketBridge(() => ws2, {})
+  )(createStore)((state = {}) => state);
+
+  ws1.onopen();
+  ws2.onopen();
+
+  // matching segment segment
+  store.dispatch({ type: 'SERVER/*/NODE', meta: { send: 'SERVER/*/NODE' } });
+
+  expect(send1).toHaveBeenCalledWith(JSON.stringify({ type: 'SERVER/*/NODE' }));
+  expect(send2).toHaveBeenCalledTimes(0);
+
+  // matching third segment
+  store.dispatch({ type: 'SERVER/1/*', meta: { send: 'SERVER/1/*' } });
+
+  expect(send1).toHaveBeenCalledWith(JSON.stringify({ type: 'SERVER/1/*' }));
+  expect(send2).toHaveBeenCalledTimes(0);
+
+  // not matching third segment
+  store.dispatch({ type: 'SERVER/*/BROWSER', meta: { send: 'SERVER/*/BROWSER' } });
+
+  expect(send1).not.toHaveBeenCalledWith(JSON.stringify({ type: 'SERVER/*/BROWSER' }));
+  expect(send2).toHaveBeenCalledTimes(0);
+
+  // not matching first segment only
+  store.dispatch({ type: 'SERVER', meta: { send: 'SERVER' } });
+
+  expect(send1).not.toHaveBeenCalledWith(JSON.stringify({ type: 'SERVER' }));
+  expect(send2).toHaveBeenCalledTimes(0);
+
+  // no matching without third segment
+  store.dispatch({ type: 'SERVER/*', meta: { send: 'SERVER/*' } });
+
+  expect(send1).not.toHaveBeenCalledWith(JSON.stringify({ type: 'SERVER/*' }));
+  expect(send2).toHaveBeenCalledTimes(0);
+
+  // matching any second and beyond segments
+  store.dispatch({ type: 'SERVER/**/*', meta: { send: 'SERVER/**/*' } });
+
+  expect(send1).toHaveBeenCalledWith(JSON.stringify({ type: 'SERVER/**/*' }));
+  expect(send2).toHaveBeenCalledTimes(0);
+
+  // matching bracelets expansion
+  store.dispatch({ type: '{CLIENT,SERVER}/**/*', meta: { send: '{CLIENT,SERVER}/**/*' } });
+
+  expect(send1).toHaveBeenCalledWith(JSON.stringify({ type: '{CLIENT,SERVER}/**/*' }));
+  expect(send2).toHaveBeenCalledTimes(0);
+
+  // matching multiple segments thru Array
+  store.dispatch({ type: 'CLIENT/**/*,SERVER/**/*', meta: { send: ['CLIENT/**/*', 'SERVER/**/*'] } });
+
+  expect(send1).toHaveBeenCalledWith(JSON.stringify({ type: 'CLIENT/**/*,SERVER/**/*' }));
+  expect(send2).toHaveBeenCalledTimes(0);
 });
