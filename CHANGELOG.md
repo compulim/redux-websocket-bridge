@@ -2,15 +2,15 @@
 
 ## [Unreleased]
 ### Added
-- `options.meta`, to merge custom `meta` to every actions unfolded
-  - `options.meta.from`:
-    - `true`, to add the WebSocket object
-    - `false`, to not add anything into `meta`
-    - otherwise, add to `meta` as-is
-- `options.tags` of `string[]`, indicates what actions this bridge is interested
-- `send` meta property changes, must be a string
-  - [`minimatch`](https://npmjs.com/package/minimatch) against `options.tags`
-  - No longer match against `options.namespace`
+- `options.fold`, to fold an action to `string` or `ArrayBuffer`
+  - return falsy to not folding the action to Web Socket
+  - by default, fold will `JSON.stringify` the action if `meta.send` set to `true` or the Web Socket
+- `options.unfold`, to unfold a message to action
+  - return falsy to not unfolding the message
+  - the unfolded action must be FSA-compliant
+  - by default, `unfold` will add `meta.webSocket`
+- `send` meta will only match against `true` or the Web Socket, but not `options.namespace`
+  - this behavior can be changed by overriding `options.fold`
 
 ## [0.2.0-0] - 2018-01-25
 ### Added
