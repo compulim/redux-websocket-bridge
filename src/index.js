@@ -24,19 +24,22 @@ const DEFAULT_OPTIONS = {
     if (action.meta && arrayify(action.meta.send).some(send => send === true || send === webSocket)) {
       const { meta, ...actionWithoutMeta } = action;
 
-      return actionWithoutMeta;
+      return JSON.stringify(actionWithoutMeta);
     }
   },
   meta      : {},
   namespace : '@@websocket/',
-  receive   : payload => tryParseJSON(payload),
-  send      : action => JSON.stringify(action),
-  unfold   : (action, webSocket, raw) => ({
-    ...action,
-    meta: {
-      webSocket
-    }
-  })
+  unfold   : (payload, webSocket, raw) => {
+    const action = tryParseJSON(payload);
+
+    return action && {
+      ...action,
+      meta: {
+        ...action.meta,
+        webSocket
+      }
+    };
+  }
 };
 
 function arrayify(obj) {
@@ -73,20 +76,24 @@ export default function createWebSocketMiddleware(urlOrFactory, options = DEFAUL
         getPayload = Promise.resolve(event.data);
       }
 
-      getPayload.then(payload => {
-        const action = options.receive(payload);
+      return getPayload.then(payload => {
+        if (options.unfold) {
+          const action = options.unfold(payload, webSocket, payload);
 
-        if (isFSA(action) && options.unfold) {
-          const nextAction = options.unfold(action, webSocket, payload);
+          if (action) {
+            if (!isFSA(action)) {
+              throw new Error('Unfolded action is not a Flux Standard Action compliant');
+            }
 
-          nextAction && store.dispatch(nextAction);
-        } else {
-          store.dispatch({
-            type: `${ namespace }${ MESSAGE }`,
-            meta: { webSocket },
-            payload
-          });
+            return action && store.dispatch(action);
+          }
         }
+
+        store.dispatch({
+          type: `${ namespace }${ MESSAGE }`,
+          meta: { webSocket },
+          payload
+        });
       });
     }
 
@@ -94,9 +101,9 @@ export default function createWebSocketMiddleware(urlOrFactory, options = DEFAUL
       if (action.type === `${ namespace }${ SEND }`) {
         webSocket.send(action.payload);
       } else {
-        const actionToSend = options.fold(action, webSocket);
+        const payload = options.fold(action, webSocket);
 
-        actionToSend && webSocket.send(options.send(actionToSend));
+        payload && webSocket.send(payload);
       }
 
       return next(action);

@@ -52,16 +52,20 @@ test('should emit message', async () => {
 test('should unfold message with custom "unfold"', async () => {
   const ws = {};
   const store = createStoreWithBridge(ws, (state = {}, action) => ({ ...state, action }), {
-    unfold: (action, webSocket) => ({
-      ...action,
-      meta: {
-        add      : 'meta added',
-        change   : 'meta changed',
-        copy     : action.meta.copy,
-        undefined: undefined,
-        webSocket
-      }
-    })
+    unfold: (payload, webSocket) => {
+      const action = JSON.parse(payload);
+
+      return {
+        ...action,
+        meta: {
+          add      : 'meta added',
+          change   : 'meta changed',
+          copy     : action.meta.copy,
+          undefined: undefined,
+          webSocket
+        }
+      };
+    }
   });
 
   ws.onopen();
@@ -99,7 +103,8 @@ test('should unfold message with custom "unfold"', async () => {
 test('should unfold message with custom "unfold" stripping out "meta"', async () => {
   const ws = {};
   const store = createStoreWithBridge(ws, (state = {}, action) => ({ ...state, action }), {
-    unfold: action => {
+    unfold: payload => {
+      const action = JSON.parse(payload);
       const { meta, ...actionWithoutMeta } = action;
 
       return actionWithoutMeta;
@@ -131,13 +136,17 @@ test('should unfold message with custom "unfold" stripping out "meta"', async ()
 test('should unfold message with custom unfold to copy whole "meta"', async () => {
   const ws = {};
   const store = createStoreWithBridge(ws, (state = {}, action) => ({ ...state, action }), {
-    unfold: (action, webSocket) => ({
-      ...action,
-      meta: {
-        ...action.meta,
-        webSocket
-      }
-    })
+    unfold: (payload, webSocket) => {
+      const action = JSON.parse(payload);
+
+      return {
+        ...action,
+        meta: {
+          ...action.meta,
+          webSocket
+        }
+      };
+    }
   });
 
   ws.onopen();
@@ -231,14 +240,14 @@ test('should namespace WebSocket events', async () => {
     ReduxWebSocketBridge(() => ws2, { namespace: 'SERVER2/' })
   )(createStore)((state = {}, action) => {
     switch (action.type) {
-    case `SERVER1/${ OPEN }`: state = { ...state, server1: true }; break;
-    case `SERVER2/${ OPEN }`: state = { ...state, server2: true }; break;
+      case `SERVER1/${ OPEN }`: state = { ...state, server1: true }; break;
+      case `SERVER2/${ OPEN }`: state = { ...state, server2: true }; break;
 
-    case `SERVER1/${ MESSAGE }`: state = { ...state, server1: action.payload }; break;
-    case `SERVER2/${ MESSAGE }`: state = { ...state, server2: action.payload }; break;
+      case `SERVER1/${ MESSAGE }`: state = { ...state, server1: action.payload }; break;
+      case `SERVER2/${ MESSAGE }`: state = { ...state, server2: action.payload }; break;
 
-    case `SERVER1/${ CLOSE }`: state = { ...state, server1: false }; break;
-    case `SERVER2/${ CLOSE }`: state = { ...state, server2: false }; break;
+      case `SERVER1/${ CLOSE }`: state = { ...state, server1: false }; break;
+      case `SERVER2/${ CLOSE }`: state = { ...state, server2: false }; break;
     }
 
     return state;
@@ -271,8 +280,8 @@ test('should send targeted action', () => {
   const ws1 = { send: send1 };
   const ws2 = { send: send2 };
   const store = applyMiddleware(
-    ReduxWebSocketBridge(() => ws1, { fold: action => (action.type === 'ACTION_FOR_WS1' || action.type === 'ACTION_FOR_ALL') && action }),
-    ReduxWebSocketBridge(() => ws2, { fold: action => (action.type === 'ACTION_FOR_WS2' || action.type === 'ACTION_FOR_ALL') && action })
+    ReduxWebSocketBridge(() => ws1, { fold: action => (action.type === 'ACTION_FOR_WS1' || action.type === 'ACTION_FOR_ALL') && JSON.stringify(action) }),
+    ReduxWebSocketBridge(() => ws2, { fold: action => (action.type === 'ACTION_FOR_WS2' || action.type === 'ACTION_FOR_ALL') && JSON.stringify(action) })
   )(createStore)((state = {}) => state);
 
   ws1.onopen();
@@ -294,10 +303,10 @@ test('should send targeted action', () => {
   expect(send2).toHaveBeenCalledWith(JSON.stringify({ type: 'ACTION_FOR_ALL' }));
 });
 
-test('should unfold with custom "receive" function', async () => {
+test('should unfold with non-JSON payload', async () => {
   const ws = {};
   const store = createStoreWithBridge(ws, (state = {}, action) => ({ ...state, action }), {
-    receive: payload => JSON.parse(new Buffer(payload, 'base64').toString())
+    unfold: payload => JSON.parse(new Buffer(payload, 'base64').toString())
   });
 
   ws.onopen();
@@ -318,4 +327,14 @@ test('should unfold with custom "receive" function', async () => {
   expect(store.getState()).toHaveProperty('action.payload.token', 't-abcde');
 
   expect(store.getState()).toHaveProperty('action.type', 'ACTION_TYPE');
+});
+
+test('should unfold a non-FSA should throw exception', async () => {
+  const ws = {};
+  const store = createStoreWithBridge(ws, (state = {}, action) => ({ ...state, action }), {
+    unfold: payload => ({ not: 'fsa' })
+  });
+
+  ws.onopen();
+  expect(ws.onmessage({ data: null })).rejects.toThrow(/Flux Standard Action/);
 });
