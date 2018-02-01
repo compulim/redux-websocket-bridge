@@ -9,10 +9,12 @@
       "request": "launch",
       "name": "Debug Jest tests",
       "args": [
-        "-i"
+        "--runInBand",
+        "--watch"
       ],
+      "cwd": "${workspaceFolder}",
       "program": "${workspaceFolder}/node_modules/jest/bin/jest.js",
-      "internalConsoleOptions": "openOnSessionStart"
+      "console": "integratedTerminal"
     }
   ]
 }

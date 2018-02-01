@@ -38,7 +38,5 @@
     "prepare": "rimraf lib && npm run build",
     "test": "jest"
   },
-  "dependencies": {
-    "minimatch": "^3.0.4"
-  }
+  "dependencies": {}
 }

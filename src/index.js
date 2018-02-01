@@ -1,5 +1,3 @@
-import minimatch         from 'minimatch';
-
 import blobToArrayBuffer from './blobToArrayBuffer';
 import isFSA             from './isFSA';
 
@@ -22,59 +20,33 @@ export function open() {
 
 const DEFAULT_OPTIONS = {
   binaryType: 'arraybuffer',
-  meta      : {
-    from: true
+  fold      : (action, webSocket) => {
+    if (action.meta && arrayify(action.meta.send).some(send => send === true || send === webSocket)) {
+      const { meta, ...actionWithoutMeta } = action;
+
+      return actionWithoutMeta;
+    }
   },
+  meta      : {},
   namespace : '@@websocket/',
-  tags      : [],
-  unfold    : true
+  receive   : payload => tryParseJSON(payload),
+  send      : action => JSON.stringify(action),
+  unfold   : (action, webSocket, raw) => ({
+    ...action,
+    meta: {
+      webSocket
+    }
+  })
 };
 
-function defaultUnfold(payload, webSocket, options) {
-  if (typeof payload === 'string') {
-    const action = tryParseJSON(payload);
-
-    // TODO: Consider optional prefix to incoming actions
-    if (isFSA(action)) {
-      const meta = { ...action.meta, ...options.meta };
-
-      if (options.meta.from === true) {
-        meta.from = webSocket;
-      } else if (options.meta.from) {
-        meta.from = options.meta.from;
-      } else {
-        delete meta.from;
-      }
-
-      return {
-        ...action,
-        meta
-      };
-    }
-  }
-}
-
-function sendPredicate(sendMeta, webSocket, options) {
-  if (!sendMeta) {
-    return false;
-  }
-
-  sendMeta = Array.isArray(sendMeta) ? sendMeta : [sendMeta];
-
-  return sendMeta.some(sendMeta =>
-    sendMeta === true
-    || sendMeta === webSocket
-    || (options.tags || []).some(tag => {
-      return typeof sendMeta === 'string' && minimatch(tag, sendMeta, { matchBase: true });
-    })
-  );
+function arrayify(obj) {
+  return obj ? Array.isArray(obj) ? obj : [obj] : [];
 }
 
 export default function createWebSocketMiddleware(urlOrFactory, options = DEFAULT_OPTIONS) {
   options = { ...DEFAULT_OPTIONS, ...options };
   options.binaryType = options.binaryType.toLowerCase();
-  options.tags = Array.isArray(options.tags) ? options.tags : [options.tags];
-  options.unfold = options.unfold && (typeof options.unfold === 'function' ? options.unfold : defaultUnfold);
+  options.unfold = options.unfold && (typeof options.unfold === 'function' ? options.unfold : DEFAULT_OPTIONS.unfold);
 
   const { namespace } = options;
 
@@ -102,33 +74,29 @@ export default function createWebSocketMiddleware(urlOrFactory, options = DEFAUL
       }
 
       getPayload.then(payload => {
-        if (options.unfold) {
-          const action = options.unfold(payload, webSocket, options);
+        const action = options.receive(payload);
 
-          if (action) {
-            return store.dispatch(action);
-          }
+        if (isFSA(action) && options.unfold) {
+          const nextAction = options.unfold(action, webSocket, payload);
+
+          nextAction && store.dispatch(nextAction);
+        } else {
+          store.dispatch({
+            type: `${ namespace }${ MESSAGE }`,
+            meta: { webSocket },
+            payload
+          });
         }
-
-        store.dispatch({
-          type: `${ namespace }${ MESSAGE }`,
-          meta: { webSocket },
-          payload
-        });
       });
     }
 
     return next => action => {
       if (action.type === `${ namespace }${ SEND }`) {
         webSocket.send(action.payload);
-      } else if (action.meta && sendPredicate(action.meta.send, webSocket, options)) {
-        const { meta, ...actionToSend } = action;
-        const { send, ...metaToSend } = meta;
+      } else {
+        const actionToSend = options.fold(action, webSocket);
 
-        webSocket.send(JSON.stringify({
-          ...actionToSend,
-          ...Object.keys(metaToSend).length ? { meta: metaToSend } : {}
-        }));
+        actionToSend && webSocket.send(options.send(actionToSend));
       }
 
       return next(action);
@@ -140,4 +108,16 @@ function tryParseJSON(json) {
   try {
     return JSON.parse(json);
   } catch (err) {}
+}
+
+export function trimUndefined(map) {
+  return Object.keys(map).reduce((nextMap, key) => {
+    const value = map[key];
+
+    if (typeof value !== 'undefined') {
+      nextMap[key] = value;
+    }
+
+    return nextMap;
+  }, {});
 }
