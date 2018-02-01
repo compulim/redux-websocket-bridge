@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.3.0-0] - 2018-02-01
 ### Added
 - `options.fold`, to fold an action to `string` or `ArrayBuffer`
   - return falsy to not folding the action to Web Socket
